@@ -6,90 +6,145 @@ using Unity.Collections;
 using UnityEngine.Assertions;
 using Unity.Networking.Transport.Utilities;
 
-public class ServerBehaviour : MonoBehaviour
+namespace TransportLayerTest
 {
-    public UdpNetworkDriver m_Driver;
-    private NativeList<NetworkConnection> m_Connections;
-    
-    NetworkPipeline networkPipeline;
-    
-    void Start ()
-	{
-        NetworkEndPoint networkEndpoint = NetworkEndPoint.AnyIpv4;
-        networkEndpoint.Port = 9000;
-
-        m_Driver = new UdpNetworkDriver(new ReliableUtility.Parameters { WindowSize = 32 });
-        if (m_Driver.Bind(networkEndpoint) != 0)
-            Debug.Log("Failed to bind to port 9000");
-        else
-            m_Driver.Listen();
-
-        m_Connections = new NativeList<NetworkConnection>(16, Allocator.Persistent);
-
-        //This must use the same pipeline(s) as the client(s)
-        networkPipeline = m_Driver.CreatePipeline(
-            typeof(ReliableSequencedPipelineStage),
-            typeof(UnreliableSequencedPipelineStage
-        ));
-    }
-
-    public void OnDestroy()
+    public class ServerBehaviour : MonoBehaviour
     {
-        m_Driver.Dispose();
-        m_Connections.Dispose();
-    }
-    
-    void Update ()
-	{
-        m_Driver.ScheduleUpdate().Complete();
-        
-        // CleanUpConnections
-        for (int i = 0; i < m_Connections.Length; i++)
+        public UdpNetworkDriver networkDriver;
+        private NativeList<NetworkConnection> networkConnections; //Holds a list of active network connections
+
+        NetworkPipeline networkPipeline; //Pipeline used for transporting packets
+
+        //Size of packet
+        const int packetSize = 4; //4 is default in example
+
+        void Start()
         {
-            if (!m_Connections[i].IsCreated)
+            configure();
+        }
+
+        //Configures server to connect to clients
+        void configure()
+        {
+            //Creates a network driver that can track up to 32 packets at a time (32 is the limit)
+            //https://github.com/Unity-Technologies/multiplayer/blob/master/com.unity.transport/Documentation/pipelines-usage.md
+            networkDriver = new UdpNetworkDriver(new ReliableUtility.Parameters { WindowSize = 32 });
+
+            //This must use the same pipeline(s) as the client(s)
+            networkPipeline = networkDriver.CreatePipeline(
+                typeof(ReliableSequencedPipelineStage),
+                typeof(UnreliableSequencedPipelineStage)
+            );
+
+            //Set up network endpoint to accept any Ipv4 connections on port 9000
+            NetworkEndPoint networkEndpoint = NetworkEndPoint.AnyIpv4;
+            networkEndpoint.Port = 9000;
+
+            //Binds the network driver to a specific network address and port
+            if (networkDriver.Bind(networkEndpoint) != 0)
+                Debug.Log("Failed to bind to port 9000");
+            else //Successfully bound to port 9000
+                networkDriver.Listen(); //Start listening for incoming connections
+
+            //Create list that can hold up to 16 connections
+            networkConnections = new NativeList<NetworkConnection>(16, Allocator.Persistent);
+        }
+
+        public void OnDestroy()
+        {
+            //Disposes unmanaged memory
+            networkDriver.Dispose();
+            networkConnections.Dispose();
+        }
+
+        //Updates network events
+        void updateNetworkEvents()
+        {
+            //Complete C# JobHandle to ensure network event updates can be processed
+            networkDriver.ScheduleUpdate().Complete();
+        }
+
+        //Clean up old, stale connections
+        void cleanupConnections()
+        {
+            for (int i = 0; i < networkConnections.Length; i++)
             {
-                m_Connections.RemoveAtSwapBack(i);
-                --i;
+                if (!networkConnections[i].IsCreated) //Network connection is not created
+                {
+                    networkConnections.RemoveAtSwapBack(i);
+                    --i;
+                }
             }
         }
-        // AcceptNewConnections
-        NetworkConnection c;
-        while ((c = m_Driver.Accept()) != default(NetworkConnection))
-        {
-            m_Connections.Add(c);
-            Debug.Log("Accepted a connection");
-        }
-        
-        DataStreamReader stream;
-        for (int i = 0; i < m_Connections.Length; i++)
-        {
-            if (!m_Connections[i].IsCreated)
-                Assert.IsTrue(true);
-            
-            NetworkEvent.Type cmd;
-            while ((cmd = m_Driver.PopEventForConnection(m_Connections[i], out stream)) !=
-                   NetworkEvent.Type.Empty)
-            {
-                if (cmd == NetworkEvent.Type.Data)
-                {
-                    var readerCtx = default(DataStreamReader.Context);
-                    uint number = stream.ReadUInt(ref readerCtx);
-                    
-                    Debug.Log("Got " + number + " from the Client adding + 2 to it.");
-                    number +=2;
 
-                    using (var writer = new DataStreamWriter(4, Allocator.Temp))
+        //Accepts new network connections
+        void acceptNewConnections()
+        {
+            NetworkConnection newConnection;
+            while ((newConnection = networkDriver.Accept()) != default(NetworkConnection))
+            {
+                networkConnections.Add(newConnection); //Add new connection to active connections
+                Debug.Log("Accepted a connection");
+            }
+        }
+
+        //Process any 
+        void processNetworkEvents()
+        {
+            DataStreamReader stream; //Used for reading data from data network events
+
+            for (int i = 0; i < networkConnections.Length; i++) //For each active connection
+            {
+                if (!networkConnections[i].IsCreated)
+                    Assert.IsTrue(true);
+
+                //Get network events for the connection
+                NetworkEvent.Type networkEvent;
+                while ((networkEvent = networkDriver.PopEventForConnection(networkConnections[i], out stream)) !=
+                       NetworkEvent.Type.Empty)
+                {
+                    if (networkEvent == NetworkEvent.Type.Data) //Connection sent data
                     {
-                        writer.Write(number);
-                        m_Driver.Send(networkPipeline, m_Connections[i], writer);
+                        //Tracks where in the data stream you are and how much you've read
+                        var readerContext = default(DataStreamReader.Context);
+
+                        #region Custom Data Processing
+
+                        //Attempt to read uint from stream
+                        uint number = stream.ReadUInt(ref readerContext);
+
+                        Debug.Log("Got " + number + " from the Client adding + 2 to it.");
+                        number += 2;
+
+                        //DataStreamWriter is needed to send data
+                        //using statement makes sure DataStreamWriter memory is disposed
+                        using (var writer = new DataStreamWriter(packetSize, Allocator.Temp))
+                        {
+                            writer.Write(number); //Write response data
+                            networkDriver.Send(networkPipeline, networkConnections[i], writer); //Send response data to client
+                        }
+
+                        #endregion Custom Data Processing
+                    }
+                    else if (networkEvent == NetworkEvent.Type.Disconnect) //Connection disconnected
+                    {
+                        Debug.Log("Client disconnected from server");
+                        //This ensures the connection will be cleaned up in cleanupConnections()
+                        networkConnections[i] = default(NetworkConnection);
                     }
                 }
-                else if (cmd == NetworkEvent.Type.Disconnect)
-                {
-                    Debug.Log("Client disconnected from server");
-                    m_Connections[i] = default(NetworkConnection);
-                }
             }
+        }
+
+        void Update()
+        {
+            updateNetworkEvents();
+
+            cleanupConnections();
+
+            acceptNewConnections();
+
+            processNetworkEvents();
         }
     }
 }

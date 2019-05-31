@@ -4,78 +4,140 @@ using UnityEngine;
 using Unity.Networking.Transport;
 using Unity.Networking.Transport.Utilities;
 
-public class ClientBehaviour : MonoBehaviour
+namespace TransportLayerTest
 {
-    public UdpNetworkDriver m_Driver;
-    public NetworkConnection m_Connection;
-    public bool m_Done;
-
-    NetworkPipeline networkPipeline;
-
-    void Start ()
-	{
-        m_Driver = new UdpNetworkDriver(new ReliableUtility.Parameters { WindowSize = 32 });
-        m_Connection = default(NetworkConnection);
-
-        NetworkEndPoint networkEndpoint = NetworkEndPoint.LoopbackIpv4;
-        networkEndpoint.Port = 9000;
-
-        //This must use the same pipeline(s) as the server
-        networkPipeline = m_Driver.CreatePipeline(
-            typeof(ReliableSequencedPipelineStage),
-            typeof(UnreliableSequencedPipelineStage
-        ));
-
-        m_Connection = m_Driver.Connect(networkEndpoint);
-    }
-    
-    public void OnDestroy()
+    public class ClientBehaviour : MonoBehaviour
     {
-        m_Driver.Dispose();
-    }
-    
-    void Update()
-    {
-        m_Driver.ScheduleUpdate().Complete();
+        public UdpNetworkDriver networkDriver;
+        public NetworkConnection connectionToServer; //Connection to the network
+        public bool done; //Indicates when client is done with the server
 
-        if (!m_Connection.IsCreated)
+        NetworkPipeline networkPipeline; //Pipeline used for transporting packets
+
+        //Size of packet
+        const int packetSize = 4; //4 is default in example
+
+        void Start()
         {
-            if (!m_Done)
-                Debug.Log("Something went wrong during connect");
-            return;
+            configure();
         }
-        
-        DataStreamReader stream;
-        NetworkEvent.Type cmd;
-        
-        while ((cmd = m_Connection.PopEvent(m_Driver, out stream)) != 
-               NetworkEvent.Type.Empty)
+
+        //Configures client to connect to a server
+        void configure()
         {
-            if (cmd == NetworkEvent.Type.Connect)
+            //Creates a network driver that can track up to 32 packets at a time (32 is the limit)
+            //https://github.com/Unity-Technologies/multiplayer/blob/master/com.unity.transport/Documentation/pipelines-usage.md
+            networkDriver = new UdpNetworkDriver(new ReliableUtility.Parameters { WindowSize = 32 });
+
+            //This must use the same pipeline(s) as the server
+            networkPipeline = networkDriver.CreatePipeline(
+                typeof(ReliableSequencedPipelineStage),
+                typeof(UnreliableSequencedPipelineStage)
+            );
+
+            connectionToServer = default(NetworkConnection); //Setup up default network connection
+
+            //Set up server address
+            NetworkEndPoint networkEndpoint = NetworkEndPoint.LoopbackIpv4;
+            networkEndpoint.Port = 9000;
+
+            //Connect to server
+            connectionToServer = networkDriver.Connect(networkEndpoint);
+        }
+
+        public void OnDestroy()
+        {
+            //Disposes unmanaged memory
+            networkDriver.Dispose();
+        }
+
+        //Updates network events
+        void updateNetworkEvents()
+        {
+            //Complete C# JobHandle to ensure network event updates can be processed
+            networkDriver.ScheduleUpdate().Complete();
+        }
+
+        //Check if client is connected to the server
+        bool checkServerConnection()
+        {
+            if (!connectionToServer.IsCreated) //Connection wasn't created
             {
-                Debug.Log("We are now connected to the server");
-                
-                var value = 1;
-                using (var writer = new DataStreamWriter(4, Allocator.Temp))
+                if (!done) //Not done with the server
+                    Debug.Log("Something went wrong during connect");
+                return false;
+            }
+
+            return true;
+        }
+
+        void processNetworkEvents()
+        {
+            DataStreamReader stream; //Used for reading data from data network events
+
+            //Get network events for the connection
+            NetworkEvent.Type networkEvent;
+            while ((networkEvent = connectionToServer.PopEvent(networkDriver, out stream)) !=
+                   NetworkEvent.Type.Empty)
+            {
+                if (networkEvent == NetworkEvent.Type.Connect) //Connected to server
                 {
-                    writer.Write(value);
-                    m_Connection.Send(m_Driver, networkPipeline, writer);
+                    Debug.Log("We are now connected to the server");
+
+                    #region Sending Custom Data
+
+                    var value = 1; //Value being sent to the server
+
+                    //DataStreamWriter is needed to send data
+                    //using statement makes sure DataStreamWriter memory is disposed
+                    using (var writer = new DataStreamWriter(packetSize, Allocator.Temp))
+                    {
+                        writer.Write(value); //Write response data
+                        connectionToServer.Send(networkDriver, networkPipeline, writer); //Send response data to server
+                    }
+
+                    #endregion Sending Custom Data
+                }
+                else if (networkEvent == NetworkEvent.Type.Data) //Server connection sent data
+                {
+                    //Tracks where in the data stream you are and how much you've read
+                    var readerContext = default(DataStreamReader.Context);
+
+                    #region Custom Data Processing
+
+                    //Attempt to read uint from stream
+                    uint value = stream.ReadUInt(ref readerContext);
+
+                    Debug.Log("Got the value = " + value + " back from the server");
+
+                    done = true; //Set flag to indicate client is done with server
+
+                    //Disconnect from server
+                    connectionToServer.Disconnect(networkDriver);
+
+                    //Reset connection to default to avoid stale reference
+                    connectionToServer = default(NetworkConnection);
+
+                    #endregion Custom Data Processing
+                }
+                else if (networkEvent == NetworkEvent.Type.Disconnect) //Disconnected from server
+                {
+                    Debug.Log("Client got disconnected from server");
+
+                    //Reset connection to default to avoid stale reference
+                    connectionToServer = default(NetworkConnection);
                 }
             }
-            else if (cmd == NetworkEvent.Type.Data)
+        }
+
+        void Update()
+        {
+            updateNetworkEvents();
+
+            if (checkServerConnection()) //Connected to server
             {
-                var readerCtx = default(DataStreamReader.Context);
-                uint value = stream.ReadUInt(ref readerCtx);
-                Debug.Log("Got the value = " + value + " back from the server");
-                m_Done = true;
-                m_Connection.Disconnect(m_Driver);
-                m_Connection = default(NetworkConnection);
-            }
-            else if (cmd == NetworkEvent.Type.Disconnect)
-            {
-                Debug.Log("Client got disconnected from server");
-                m_Connection = default(NetworkConnection);
-            }
+                processNetworkEvents();
+            }            
         }
     }
 }
