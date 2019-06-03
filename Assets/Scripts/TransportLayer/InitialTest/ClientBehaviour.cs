@@ -14,9 +14,6 @@ namespace TransportLayerTest
 
         NetworkPipeline networkPipeline; //Pipeline used for transporting packets
 
-        //Size of packet
-        const int packetSize = 4; //4 is default in example
-
         void Start()
         {
             configure();
@@ -87,10 +84,11 @@ namespace TransportLayerTest
                     #region Sending Custom Data
 
                     var value = 1; //Value being sent to the server
+                    int dataSize = 4; //Size of data being sent in bytes
 
                     //DataStreamWriter is needed to send data
                     //using statement makes sure DataStreamWriter memory is disposed
-                    using (var writer = new DataStreamWriter(packetSize, Allocator.Temp))
+                    using (var writer = new DataStreamWriter(dataSize, Allocator.Temp))
                     {
                         writer.Write(value); //Write response data
                         connectionToServer.Send(networkDriver, networkPipeline, writer); //Send response data to server
