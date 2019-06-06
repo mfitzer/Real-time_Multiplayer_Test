@@ -29,8 +29,7 @@ namespace TransportLayerTest
 
             //This must use the same pipeline(s) as the client(s)
             networkPipeline = networkDriver.CreatePipeline(
-                typeof(ReliableSequencedPipelineStage),
-                typeof(UnreliableSequencedPipelineStage)
+                typeof(ReliableSequencedPipelineStage)
             );
 
             //Set up network endpoint to accept any Ipv4 connections on port 9000

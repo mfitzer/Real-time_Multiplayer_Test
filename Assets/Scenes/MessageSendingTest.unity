@@ -120,93 +120,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &119237597
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 119237599}
-  - component: {fileID: 119237598}
-  m_Layer: 0
-  m_Name: Client
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &119237598
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 119237597}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c33872a4a852cc5428adcc9163ddc39c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  done: 0
---- !u!4 &119237599
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 119237597}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_RootOrder: 6
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &124839324
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 124839325}
-  - component: {fileID: 124839326}
-  m_Layer: 0
-  m_Name: Server
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &124839325
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 124839324}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_RootOrder: 5
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &124839326
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 124839324}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c78f945b82f685840a90ffb7a93fa640, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &899427400
 GameObject:
   m_ObjectHideFlags: 0
@@ -300,6 +213,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1158175553}
   - component: {fileID: 1158175552}
+  - component: {fileID: 1158175555}
+  - component: {fileID: 1158175554}
   m_Layer: 0
   m_Name: NetworkSettings
   m_TagString: Untagged
@@ -319,7 +234,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 14d629d7af9d12342b6ee72485344277, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  networkProfile: {fileID: 11400000, guid: 13f7e562bc1f2ff4aa66e88c7c072236, type: 2}
+  networkProfile: {fileID: 0}
 --- !u!4 &1158175553
 Transform:
   m_ObjectHideFlags: 0
@@ -334,6 +249,31 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1158175554
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1158175551}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c33872a4a852cc5428adcc9163ddc39c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  done: 0
+--- !u!114 &1158175555
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1158175551}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c78f945b82f685840a90ffb7a93fa640, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1343771606
 GameObject:
   m_ObjectHideFlags: 0
@@ -438,7 +378,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 34ec973436cdfa047b14b692c8d4209f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  server: {fileID: 124839326}
+  server: {fileID: 1158175555}
   maxRefreshRate: 10
 --- !u!1 &1378522479
 GameObject:
@@ -636,5 +576,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 34ec973436cdfa047b14b692c8d4209f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  server: {fileID: 124839326}
+  server: {fileID: 1158175555}
   maxRefreshRate: 10

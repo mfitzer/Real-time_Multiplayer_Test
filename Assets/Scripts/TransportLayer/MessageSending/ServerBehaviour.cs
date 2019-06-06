@@ -9,6 +9,17 @@ namespace MessageSending
 {
     public class ServerBehaviour : MonoBehaviour
     {
+        private static ServerBehaviour instance;
+        public static ServerBehaviour Instance
+        {
+            get
+            {
+                if (!instance)
+                    instance = FindObjectOfType<ServerBehaviour>();
+                return instance;
+            }
+        }
+
         public UdpNetworkDriver networkDriver;
         private NativeList<NetworkConnection> networkConnections; //Holds a list of active network connections
 
@@ -49,8 +60,7 @@ namespace MessageSending
 
             //This must use the same pipeline(s) as the client(s)
             networkPipeline = networkDriver.CreatePipeline(
-                typeof(ReliableSequencedPipelineStage),
-                typeof(UnreliableSequencedPipelineStage)
+                typeof(ReliableSequencedPipelineStage)
             );
 
             //Set up network endpoint to accept any Ipv4 connections on port networkSettings.port

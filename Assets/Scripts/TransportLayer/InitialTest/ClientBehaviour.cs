@@ -28,8 +28,7 @@ namespace TransportLayerTest
 
             //This must use the same pipeline(s) as the server
             networkPipeline = networkDriver.CreatePipeline(
-                typeof(ReliableSequencedPipelineStage),
-                typeof(UnreliableSequencedPipelineStage)
+                typeof(ReliableSequencedPipelineStage)
             );
 
             connectionToServer = default(NetworkConnection); //Setup up default network connection

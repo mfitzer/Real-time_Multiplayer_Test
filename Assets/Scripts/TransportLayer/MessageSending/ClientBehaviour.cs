@@ -8,8 +8,20 @@ namespace MessageSending
 {
     public class ClientBehaviour : MonoBehaviour
     {
+        private static ClientBehaviour instance;
+        public static ClientBehaviour Instance
+        {
+            get
+            {
+                if (!instance)
+                    instance = FindObjectOfType<ClientBehaviour>();
+                return instance;
+            }
+        }
+
         public UdpNetworkDriver networkDriver;
         public NetworkConnection connectionToServer; //Connection to the network
+        NetworkEndPoint networkEndPoint; //Endpoint configured for connecting to the server
 
         public bool done; //Indicates when client is done with the server
 
@@ -18,6 +30,22 @@ namespace MessageSending
         Queue<Message> messageQueue; //Holds messages waiting to be sent to the server
 
         NetworkSettings networkSettings; //Settings for the network connection
+
+        //Indicates if client is connected to the server
+        public bool connectedToServer
+        {
+            get
+            {
+                if (!connectionToServer.IsCreated) //Connection wasn't created
+                {
+                    //if (!done) //Not done with the server
+                    //Debug.Log("Something went wrong during connect");
+                    return false;
+                }
+
+                return true;
+            }
+        }
 
         void Start()
         {
@@ -39,29 +67,33 @@ namespace MessageSending
 
             //This must use the same pipeline(s) as the server
             networkPipeline = networkDriver.CreatePipeline(
-                typeof(ReliableSequencedPipelineStage),
-                typeof(UnreliableSequencedPipelineStage)
+                typeof(ReliableSequencedPipelineStage)
             );
 
             connectionToServer = default(NetworkConnection); //Setup up default network connection
 
             //Set up server address
-            NetworkEndPoint networkEndpoint;
-
             if (networkSettings.serverIP != "") //Server IP is set
             {
-                networkEndpoint = NetworkEndPoint.Parse(networkSettings.serverIP, networkSettings.port);
+                networkEndPoint = NetworkEndPoint.Parse(networkSettings.serverIP, networkSettings.port);
                 Debug.Log("Connecting to server: " + networkSettings.serverIP + " on port: " + networkSettings.port);
             }
             else
             {
                 Debug.Log("Connecting to server on LoopbackIpv4");
-                networkEndpoint = NetworkEndPoint.LoopbackIpv4;
-                networkEndpoint.Port = networkSettings.port;
+                networkEndPoint = NetworkEndPoint.LoopbackIpv4;
+                networkEndPoint.Port = networkSettings.port;
             }
 
-            //Connect to server
-            connectionToServer = networkDriver.Connect(networkEndpoint);
+            connectToServer();
+        }
+
+        //Connect to server
+        bool connectToServer()
+        {
+            connectionToServer = networkDriver.Connect(networkEndPoint);
+
+            return connectionToServer.IsCreated; //Indicate if the server connection has been created
         }
 
         public void OnDestroy()
@@ -77,19 +109,6 @@ namespace MessageSending
             networkDriver.ScheduleUpdate().Complete();
         }
 
-        //Check if client is connected to the server
-        bool checkServerConnection()
-        {
-            if (!connectionToServer.IsCreated) //Connection wasn't created
-            {
-                if (!done) //Not done with the server
-                    Debug.Log("Something went wrong during connect");
-                return false;
-            }
-
-            return true;
-        }
-
         void processNetworkEvents()
         {
             DataStreamReader stream; //Used for reading data from data network events
@@ -101,7 +120,7 @@ namespace MessageSending
             {
                 if (networkEvent == NetworkEvent.Type.Connect) //Connected to server
                 {
-                    Debug.Log("We are now connected to the server");
+                    Debug.Log("<color=green>We are now connected to the server</color>");
                 }
                 else if (networkEvent == NetworkEvent.Type.Data) //Server connection sent data
                 {
@@ -115,7 +134,13 @@ namespace MessageSending
                 }
                 else if (networkEvent == NetworkEvent.Type.Disconnect) //Disconnected from server
                 {
-                    Debug.Log("Client got disconnected from server");
+                    Debug.Log("<color=red>Client got disconnected from server</color>");
+
+                    if (!done) //Wasn't supposed to disconnect
+                    {
+                        Debug.Log("<color=blue>Attempting to reconnect to server.</color>");
+                        connectToServer(); //Try to reconnect
+                    }
 
                     //Reset connection to default to avoid stale reference
                     connectionToServer = default(NetworkConnection);
@@ -130,26 +155,32 @@ namespace MessageSending
         //Adds the message to the queue of messages to be sent
         public void sendMessage(Message message)
         {
-            messageQueue.Enqueue(message);
+            if (connectedToServer)
+                messageQueue.Enqueue(message);
         }
 
         //Sends messages in messageQueue
         void sendMessages()
         {
-            //Send each message in messageQueue
-            while (messageQueue.Count > 0)
+            if (connectedToServer)
             {
-                Message message = messageQueue.Dequeue(); //Get next message
-                byte[] msgBytes = message.toBytes(); //Convert message to bytes
-
-                //DataStreamWriter is needed to send data
-                //using statement makes sure DataStreamWriter memory is disposed
-                using (var writer = new DataStreamWriter(msgBytes.Length, Allocator.Temp))
+                //Send each message in messageQueue
+                while (messageQueue.Count > 0)
                 {
-                    writer.Write(msgBytes); //Write msg byte data
+                    Message message = messageQueue.Dequeue(); //Get next message
+                    byte[] msgBytes = message.toBytes(); //Convert message to bytes
 
-                    //Send msg data to server
-                    connectionToServer.Send(networkDriver, networkPipeline, writer);
+                    //DataStreamWriter is needed to send data
+                    //using statement makes sure DataStreamWriter memory is disposed
+                    using (var writer = new DataStreamWriter(msgBytes.Length, Allocator.Temp))
+                    {
+                        writer.Write(msgBytes); //Write msg byte data
+
+                        //Send msg data to server
+                        connectionToServer.Send(networkDriver, networkPipeline, writer);
+
+                        Debug.Log("Sending message of length: " + msgBytes.Length);
+                    }
                 }
             }
         }
@@ -160,11 +191,11 @@ namespace MessageSending
         {
             updateNetworkEvents();
 
-            if (checkServerConnection()) //Connected to server
+            if (connectedToServer) //Connected to server
             {
                 processNetworkEvents(); //Process any new network events
                 sendMessages(); //Send any queued messages
-            }            
+            }
         }
     }
 }
